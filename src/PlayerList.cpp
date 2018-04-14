@@ -16,6 +16,12 @@ struct PlayerData{
 };
 */
 
+#define C_REQUEST_SERVER_EVENTS 1
+#define S_SEND_SERVER_EVENTS 1
+#define C_REGISTER_CLIENT_EVENT 2
+#define S_CLIENT_EVENT_ACKNOWLEDGEMENT 2
+
+
 PlayerList::PlayerList()
 {
 }
@@ -38,6 +44,10 @@ void PlayerList::init(){
     listener.listen(4474);
     selector.add(listener);
     std::cout << "Playerlist init!" << std::endl;
+
+    PlayerList::registerServerEvent("invaders:popVirus",502);
+
+    //std::cout << PlayerList::registerClientEvent("convex:test") << std::endl;
 }
 
 PlayerList::~PlayerList()
@@ -54,6 +64,23 @@ unsigned int PlayerList::getFreshID(){
         }
     }
     return -1;
+}
+
+void PlayerList::registerServerEvent( const char* eventName, sf::Uint16 id )
+{
+    if ( serverEvents.find(eventName) == serverEvents.end() ){
+        serverEvents[eventName] = id;
+
+        std::cout << "Registered server event " << eventName << ' ' << id << std::endl;
+
+        sf::Packet newEvent;
+        sf::Uint16 packetCode = 1;
+        newEvent << packetCode << eventName << id;
+        PlayerList::broadcastTCPMessage(newEvent);
+    }
+    else{
+        std::cout << "Event already registered " << eventName << std::endl;
+    }
 }
 
 
@@ -76,16 +103,17 @@ PlayerData* PlayerList::getNextPlayerData(){
 
 PlayerData* PlayerList::getConnection( unsigned int playerID ){
     for ( std::vector<PlayerData*>::iterator it = playerData.begin(); it != playerData.end();it++){
-        if ( (*it)->id = playerID )
+        if ( (*it)->id == playerID )
             return (*it);
     }
     return 0;
 }
 
+/*
 unsigned int test1;
 char test2[333];
 std::size_t test3;
-
+*/
 void PlayerList::process(){
     if ( selector.wait() ){
         acceptNewConnection();
@@ -98,7 +126,7 @@ void PlayerList::process(){
 void PlayerList::sendPeerData( PlayerData* connection ){
 
     //Sending peer-spawning packets
-    unsigned current = 0;
+    //unsigned current = 0;
 /*
     for ( std::vector<PlayerData*>::iterator it = playerData.begin(); it != playerData.end(); ++it ){
         if ( ( (*it)->isOn ) && ( (*it)->crystalType != 0 ) ){
@@ -154,6 +182,8 @@ void PlayerList::acceptNewConnection(){
 char receiveBuffer[256];
 std::size_t received;
 
+sf::Packet packet;
+
 //sf::Socket::Status PlayerList::receiveMessage(unsigned int& id, char* buffer, std::size_t & received ){
 void PlayerList::receiveMessage(){
     sf::Socket::Status status;
@@ -161,9 +191,10 @@ void PlayerList::receiveMessage(){
     // TCP
     for ( std::vector<PlayerData*>::iterator it = playerData.begin(); it != playerData.end();){
         if ( (*it)->isOn && selector.isReady( (*it)->tcpSocket ) ){
-            status = (*it)->tcpSocket.receive(receiveBuffer,256,received);
+            //status = (*it)->tcpSocket.receive(receiveBuffer,256,received);
+            status = (*it)->tcpSocket.receive(packet);
             if ( status == sf::Socket::Status::Done){
-                std::cout << "[TCP]";
+                std::cout << "[TCP] ";
                 parseBuffer( (*it)->id );
             } else if ( status == sf::Socket::Status::Disconnected ){
                 std::cout << "Player Disconnected " << (*it)->id << std::endl;
@@ -192,9 +223,10 @@ void PlayerList::receiveMessage(){
     for ( std::vector<PlayerData*>::iterator it = playerData.begin(); it != playerData.end();){
         if ( (*it)->isOn && selector.isReady( udpSocket ) ){
             unsigned short int p = 30125;
-            status = udpSocket.receive(receiveBuffer,256,received,(*it)->ipAddress,p);
+            //status = udpSocket.receive(receiveBuffer,256,received,(*it)->ipAddress,p);
+            status = udpSocket.receive(packet,(*it)->ipAddress,p);
             if ( status == sf::Socket::Status::Done){
-                std::cout << "[UDP]";
+                std::cout << "[UDP] ";
                 parseBuffer( (*it)->id );
             }
             else{
@@ -210,161 +242,72 @@ void PlayerList::receiveMessage(){
 
 }
 
+sf::Uint16 clientEvent = 50; // start allocation at 50
+
+sf::Uint16 PlayerList::registerClientEvent(const char* eventName){
+    std::map<std::string,sf::Uint16,strless>::const_iterator it = clientEvents.find(eventName);
+
+    if ( it == clientEvents.end() ){
+        sf::Uint16 id = clientEvent;
+        clientEvent++;
+        clientEvents[eventName] = id;
+        std::cout << "Registered client event " << eventName << ' ' << id << std::endl;
+        return id;
+    }
+    else{
+        std::cout << "Client Event already registered " << eventName << ' ' << it->second << std::endl;
+        return it->second;
+    }
+}
+
+void PlayerList::sendServerEvents( unsigned int player ){
+    packet.clear();
+    sf::Uint16 packetCode = 1;
+    packet << packetCode;
+
+    for ( std::map<std::string,sf::Uint16,strless>::const_iterator i = serverEvents.begin(); i != serverEvents.end(); ++i ) {
+        //cout << (*i).first << " " << (*i).second << endl;
+        packet << (*i).first << (*i).second;
+        std::cout << (*i).first << (*i).second << std::endl;
+        // packet << STRING_NAME << INT_CODE
+    }
+
+    sf::Socket::Status stat = getConnection(player)->tcpSocket.send(packet);
+    std::cout << stat << ' ' << sf::Socket::Status::Done << std::endl;
+}
+
 void PlayerList::parseBuffer(unsigned int player){
-    /*
-        std::cout << "Received : " << received << " " <<
-        ((int*)SyncManager::packageBuffer)[0] << " " <<
-        ((int*)SyncManager::packageBuffer)[1] << std::endl;
-    */
+    sf::Uint16 packetCode;
 
-    //unsigned int streampos = 0;
-    char * cursor = receiveBuffer;
+    packet >> packetCode;
 
-    cursor[received] = 0;
+    std::cout << "Player " << player << " sent : " << packetCode << std::endl;
+    if ( !packet.endOfPacket() ){
+        std::cout << " with some extra data" << std::endl;
+    }
 
-    printf ( "Received message from %u\n    %s\n", player, cursor );
+    switch ( packetCode ){
+        case 1: // Request Server Events
+            PlayerList::sendServerEvents( player );
+            std::cout << "Sent server events to player " << player << std::endl;
+            break;
+        case 2:{ // Reguest Client Event Code
+            sf::Uint16 clientEventCode;
+            std::string eventName;
+            packet >> eventName;
+            clientEventCode = PlayerList::registerClientEvent(eventName.c_str());
 
-
-    //std::cout << "Received " << received << " bytes." << std::endl;
-    /*
-    while ( cursor - receiveBuffer < received )
-    {
-        std::cout<<"BOOM"<<std::endl;
-        switch( *cursor ){ // Packet Code
-            case 1:{ // Crystal Type
-                std::cout << "Type 1 - crystal type" << std::endl;
-                //redirectPacket( player, cursor, 2, false );
-                proxyTCPMessage( player, cursor, 2, false );
-                cursor++;
-                //Stage * stage = StageManager::getStage();
-                switch( *cursor ){ // Crystal Type Number
-                    case 1:{
-                        //Emeraldo * emeraldo = new Emeraldo();
-                        //stage->addEntity( emeraldo );
-                        //SyncManager::crystals[player] = emeraldo;
-                        std::cout << "Emeraldo spawned!" << std::endl;
-                        break;
-                    }
-                    case 2:{
-                        //Rubie * rubie = new Rubie();
-                        //stage->addEntity( rubie );
-                        //SyncManager::crystals[player] = rubie;
-                        std::cout << "Rubie spawned!" << std::endl;
-                        break;
-                    }
-                    case 3:{
-                        //Sapheer * sapheer = new Sapheer();
-                        //stage->addEntity( sapheer );
-                        //SyncManager::crystals[player] = sapheer;
-                        std::cout << "Sapheer spawned!" << std::endl;
-                        break;
-                    }
-                }
-                getConnection(player)->crystalType = *cursor;
-                cursor++;
-                break;
-            }
-            case 2:{ // Position package
-                //std::cout << "Type 2 - position type" << std::endl;
-                proxyTCPMessage( player, cursor, 9, true );
-                cursor++;
-                sf::Int32 x,y;
-                memcpy(&x,cursor,4);
-                memcpy(&y,cursor+4,4);
-                PlayerData * connection = getConnection(player);
-                connection->position.x = x;
-                connection->position.y = y;
-                cursor += 8;
-                //PlayerList::detectCollisions();
-                break;
-            }
-            case 3:{ // Basic attack package
-                std::cout << "Type 3 - basic attack" << std::endl;
-                //redirectPacket( player, cursor, 9, true );
-                proxyTCPMessage( player, cursor, 9, true );
-                cursor++;
-
-                //memcpy(SyncManager::options, cursor, 8 );
-                //float x,y;
-                //memcpy(&x, SyncManager::options, 4);
-                //memcpy(&y, SyncManager::options+4, 4);
-                //std::cout << "RECEIVED COORDS " << x << " " << y << std::endl;
-
-                cursor += 8;
-                break;
-            }
-            case 4:{ // Ultimate package ( no options )
-                std::cout << "Type 4 - ultimate ( no options )" << std::endl;
-                //redirectPacket( player, cursor, 1, true );
-                proxyTCPMessage( player, cursor, 1, true );
-                cursor++;
-                //memcpy(SyncManager::options,cursor,1);
-                //SyncManager::crystals[player]->ultimate();
-                break;
-            }
-            case 5:{ // Ultimate package ( 1 byte )
-                std::cout << "Type 5 - ultimate ( 1 byte )" << std::endl;
-                //redirectPacket( player, cursor, 2, true );
-                proxyTCPMessage( player, cursor, 2, true );
-                cursor++;
-                //memcpy(SyncManager::options,cursor,1);
-                //SyncManager::crystals[player]->ultimate();
-                cursor++;
-                break;
-            }
-            case 6:{ // Ultimate package ( 4 bytes )
-                std::cout << "Type 6 - ultimate ( 4 bytes )" << std::endl;
-                //redirectPacket( player, cursor, 5, true );
-                proxyTCPMessage( player, cursor, 5, true );
-                cursor++;
-                //memcpy(SyncManager::options,cursor,4);
-                //SyncManager::crystals[player]->ultimate();
-                cursor+=4;
-                break;
-            }
-            case 7:{ // client to server only ( ctso )
-                std::cout << "Type 7 - Laser Collision" << std::endl;
-                //no redirection
-                cursor++;
-                int affectedPlayer;
-                memcpy(&affectedPlayer,cursor,4);
-                damageCrystal( affectedPlayer );
-                cursor+=4;
-                break;
-            }
-            case 8:{ // client to server only ( ctso )
-                std::cout << "Type 8 - Shield Collision" << std::endl;
-                //no redirection
-                cursor++;
-                int affectedPlayer;
-                memcpy(&affectedPlayer,cursor,4);
-                //damageCrystal( affectedPlayer );
-                pushCrystal(affectedPlayer,player,30.f);
-                cursor+=4;
-                break;
-            }
-            case 9:{ // client to server only ( ctso )
-                std::cout << "Type 9 - Particle Collision" << std::endl;
-                //no redirection
-                cursor++;
-                int affectedPlayer;
-                memcpy(&affectedPlayer,cursor,4);
-                damageCrystal( affectedPlayer );
-                cursor+=4;
-                break;
-            }
-            //case 8 - sapheer shield collision ( ctso )
-            //case 9 - basic attack collision ( ctso )
-            //case 10- hp ( stco )
-            //case 11- disconnected ( stco )
-            //case 12- player ID ( stco )
-            //case 13- impulse ( stco )
-            default:{
-                cursor++;
-            }
-            //...
+            packet.clear();
+            packet << (sf::Uint16)(2);
+            packet << eventName;
+            packet << clientEventCode;
+            getConnection(player)->tcpSocket.send(packet);
+            break;
         }
-    }*/
+        case 502: // debug purpose
+            registerServerEvent("vrp:bankrobbery",5010);
+            break;
+    }
 }
 
 
@@ -400,6 +343,21 @@ void PlayerList::broadcastTCPMessage(char* buffer, size_t size){
 void PlayerList::broadcastUDPMessage(char* buffer, size_t size){
 
 }
+
+void PlayerList::broadcastTCPMessage(sf::Packet packetToSend ){
+    for ( std::vector<PlayerData*>::iterator it = playerData.begin(); it != playerData.end(); ++it ){
+        if ( (*it)->isOn ){
+            //What if the socket disconnected in the meantime?
+            (*it)->tcpSocket.send(packetToSend);
+            //std::cout << "BROADCASTED PACKET" << std::endl;
+        }
+    }
+}
+
+void PlayerList::broadcastUDPMessage(sf::Packet packetToSend ){
+
+}
+
 /*
 void PlayerList::damageCrystal( unsigned int player ){
 

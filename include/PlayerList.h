@@ -8,6 +8,16 @@
 #define MAX_PLAYERS 16
 #endif // MAX_PLAYERS
 
+#include <map>
+#include <string>
+
+class strless {
+   public:
+      bool operator() (const std::string & first, const std::string & second ) const  {
+         return first < second;
+      }
+};
+
 class PlayerList
 {
     public:
@@ -23,6 +33,9 @@ class PlayerList
         void proxyUDPMessage( unsigned int id, char * buffer, size_t size, bool skipSender );
         void broadcastTCPMessage( char * buffer, size_t size );
         void broadcastUDPMessage( char * buffer, size_t size );
+
+        void broadcastTCPMessage( sf::Packet packetToSend );
+        void broadcastUDPMessage( sf::Packet packetToSend );
 
     protected:
 
@@ -48,6 +61,13 @@ class PlayerList
 
         bool takenIDS[MAX_PLAYERS];
         unsigned int getFreshID();
+
+        void registerServerEvent( const char * eventName, sf::Uint16 id );
+        std::map<std::string,sf::Uint16,strless> serverEvents;
+        void sendServerEvents( unsigned int player );
+
+        sf::Uint16 registerClientEvent( const char * eventName );
+        std::map<std::string,sf::Uint16,strless> clientEvents;
 };
 
 #endif // PLAYERLIST_H
