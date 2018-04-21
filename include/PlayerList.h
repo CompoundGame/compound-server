@@ -46,6 +46,14 @@ class PlayerList
 
         sf::Uint16 registerObject( const Object & obj );
 
+        void registerServerEvent( const char * eventName, sf::Uint16 id );
+
+        std::map<std::string,sf::Uint16,strless> serverEvents;
+        void sendServerEvents( unsigned int player );
+
+        sf::Uint16 registerClientEvent( const char * eventName );
+        std::map<std::string,sf::Uint16,strless> clientEvents;
+
     protected:
 
     private:
@@ -72,13 +80,6 @@ class PlayerList
 
         bool takenIDS[MAX_PLAYERS];
         unsigned int getFreshID();
-
-        void registerServerEvent( const char * eventName, sf::Uint16 id );
-        std::map<std::string,sf::Uint16,strless> serverEvents;
-        void sendServerEvents( unsigned int player );
-
-        sf::Uint16 registerClientEvent( const char * eventName );
-        std::map<std::string,sf::Uint16,strless> clientEvents;
 };
 
 #endif // PLAYERLIST_H

@@ -18,6 +18,8 @@ struct PlayerData{
 
 #include "Events.h"
 
+#include "LuaConsole.h"
+
 PlayerList::PlayerList()
 {
 }
@@ -45,7 +47,7 @@ void PlayerList::init(){
     selector.add(listener);
     std::cout << "Playerlist init!" << std::endl;
 
-    PlayerList::registerServerEvent("invaders:popVirus",502);
+    //PlayerList::registerServerEvent("invaders:popVirus",502);
 
     //std::cout << PlayerList::registerClientEvent("convex:test") << std::endl;
 }
@@ -319,7 +321,7 @@ void PlayerList::parseBuffer(unsigned int player){
         }
         case S_REQUEST_REGISTER_OBJECT:{
 
-            // Parse the packet, extracting objec data
+            // Parse the packet, extracting object data
             sf::Uint16 clientID;
             float x,y,vx,vy,friction,rotation;
             sf::Uint16 textureID;
@@ -356,6 +358,7 @@ void PlayerList::parseBuffer(unsigned int player){
             sf::Uint16 serverID;
             float x,y;
             packet >> serverID >> x >> y;
+            std::cout << "position : " << serverID << ' ' << x << ' ' << y << std::endl;
             if ( m_objects[serverID] != 0 ){
                 sf::Packet newPacket = m_objects[serverID]->setPosition(x,y);
                 proxyTCPMessage( player, newPacket );
@@ -415,10 +418,11 @@ void PlayerList::parseBuffer(unsigned int player){
             }
             break;
         }
-
-        case 502: // debug purpose
-            registerServerEvent("vrp:bankrobbery",5010);
-            break;
+        default:{
+            if ( packetCode >= 500 ){
+                LuaConsole::triggerServerEvent(packetCode, packet);
+            }
+        }
     }
 }
 
@@ -444,10 +448,12 @@ void PlayerList::proxyUDPMessage(unsigned int id, char* buffer, size_t size, boo
 }
 
 void PlayerList::proxyTCPMessage(unsigned int _id, sf::Packet packetToSend){
+    std::cout << "ENTERED PROXY FUNCTION" << std::endl;
     for ( std::vector<PlayerData*>::iterator it = playerData.begin(); it != playerData.end(); ++it ){
         if ( (*it)->isOn ){
             if ( (*it)->id == _id ) // skip the sender
                 continue;
+            std::cout << "SENDING IN PROXY FUNCTION" << std::endl;
             (*it)->tcpSocket.send(packetToSend);
         }
     }

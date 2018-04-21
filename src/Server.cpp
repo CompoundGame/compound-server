@@ -1,14 +1,6 @@
 #include "Server.h"
 
-Server::Server()
-{
-    //ctor
-}
-
-Server::~Server()
-{
-    //dtor
-}
+PlayerList Server::playerList;
 
 void Server::init(){
     playerList.init();

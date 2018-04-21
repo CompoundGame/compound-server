@@ -9,7 +9,8 @@
 # include <lauxlib.h>
 #endif
 
-//#include <SFML/System.hpp>
+#include <SFML/System.hpp>
+#include <SFML/Network/Packet.hpp>
 
 class LuaConsole
 {
@@ -21,6 +22,8 @@ class LuaConsole
 
         //static void triggerClientEvent( const char * eventName );
         //static void triggerKeyPressEvent( sf::Uint16 key );
+
+        static void triggerServerEvent( sf::Uint16 eventCode, sf::Packet restOfPacket );
     protected:
 
     private:

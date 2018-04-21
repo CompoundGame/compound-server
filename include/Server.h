@@ -6,18 +6,17 @@
 class Server
 {
     public:
-        Server();
-        virtual ~Server();
+        static void wait();
+        static PlayerList playerList;
+        static void process();
 
-        void wait();
-        PlayerList playerList;
-        void process();
-
-        void init();
+        static void init();
 
     protected:
 
     private:
+        Server();
+        virtual ~Server();
 };
 
 #endif // SERVER_H

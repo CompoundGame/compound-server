@@ -5,8 +5,7 @@
 #include "LuaConsole.h"
 
 int main(){
-    Server server;
-    server.init();
+    Server::init();
     //SyncManager::init();
 
     LuaConsole::init();
@@ -18,7 +17,7 @@ int main(){
             //SyncManager::receivePackets();
         //}
         //SyncManager::sceneProcess();
-        server.process();
+        Server::process();
     }
     return 0;
 }
