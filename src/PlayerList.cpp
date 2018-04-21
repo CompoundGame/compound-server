@@ -16,11 +16,7 @@ struct PlayerData{
 };
 */
 
-#define C_REQUEST_SERVER_EVENTS 1
-#define S_SEND_SERVER_EVENTS 1
-#define C_REGISTER_CLIENT_EVENT 2
-#define S_CLIENT_EVENT_ACKNOWLEDGEMENT 2
-
+#include "Events.h"
 
 PlayerList::PlayerList()
 {
@@ -29,6 +25,10 @@ PlayerList::PlayerList()
 void PlayerList::init(){
     for ( unsigned int i = 0; i < MAX_PLAYERS; i++ )
         takenIDS[i] = false;
+
+    for ( sf::Uint16 i = 0; i < MAX_SERVER_OBJECTS; i++ ){
+        m_objects[i] = 0;
+    }
 
     playerCount = 0;
 
@@ -276,6 +276,19 @@ void PlayerList::sendServerEvents( unsigned int player ){
     std::cout << stat << ' ' << sf::Socket::Status::Done << std::endl;
 }
 
+sf::Uint16 PlayerList::registerObject(const Object & obj){
+    for ( sf::Uint16 i = 0; i < MAX_SERVER_OBJECTS; i++ ){
+        if ( m_objects[i] == 0 ){
+            m_objects[i] = new Object();
+            *(m_objects[i]) = obj;
+            std::cout << "Registered server object serverID " << i << std::endl;
+            return i;
+        }
+    }
+    return 0;
+}
+
+
 void PlayerList::parseBuffer(unsigned int player){
     sf::Uint16 packetCode;
 
@@ -287,11 +300,11 @@ void PlayerList::parseBuffer(unsigned int player){
     }
 
     switch ( packetCode ){
-        case 1: // Request Server Events
+        case S_REQUEST_SERVER_EVENTS: // Request Server Events
             PlayerList::sendServerEvents( player );
             std::cout << "Sent server events to player " << player << std::endl;
             break;
-        case 2:{ // Reguest Client Event Code
+        case S_REGISTER_CLIENT_EVENT:{ // Reguest Client Event Code
             sf::Uint16 clientEventCode;
             std::string eventName;
             packet >> eventName;
@@ -304,6 +317,105 @@ void PlayerList::parseBuffer(unsigned int player){
             getConnection(player)->tcpSocket.send(packet);
             break;
         }
+        case S_REQUEST_REGISTER_OBJECT:{
+
+            // Parse the packet, extracting objec data
+            sf::Uint16 clientID;
+            float x,y,vx,vy,friction,rotation;
+            sf::Uint16 textureID;
+            packet >> clientID >> x >> y >> vx >> vy >> friction >> rotation >> textureID;
+
+            std::cout << "Received entity from client " << player << " with following data :" << std::endl;
+            std::cout << "   " << clientID << ' ' << x << ' ' << y << ' ' << vx << ' ' << vy << ' ' << friction << ' ' << rotation << ' ' << textureID << std::endl;
+
+            // Create the object, assign attributes
+            Object newObject;
+            newObject.setPosition(x,y);
+            newObject.setVelocity(vx,vy);
+            newObject.setFriction(friction);
+            newObject.setRotation(rotation);
+            newObject.setTextureID(textureID);
+
+            // Register as server object, get the serverID
+            sf::Uint16 serverID = registerObject(newObject);
+
+            // Generate a callback to the source. ( clientID, serverID ) pair.
+            sf::Packet newPacket;
+            newPacket << C_REGISTRATION_CODE << clientID << serverID;
+            getConnection(player)->tcpSocket.send(packet);
+
+            // Proxy the newly registered object to everyone else
+            newPacket.clear();
+            newPacket = m_objects[serverID]->generateObjectPacket();
+            proxyTCPMessage( player, newPacket ); // skip the source player
+
+            break;
+        }
+
+        case SHARED_POSITION:{
+            sf::Uint16 serverID;
+            float x,y;
+            packet >> serverID >> x >> y;
+            if ( m_objects[serverID] != 0 ){
+                sf::Packet newPacket = m_objects[serverID]->setPosition(x,y);
+                proxyTCPMessage( player, newPacket );
+            }
+            break;
+        }
+        case SHARED_VELOCITY:{
+            sf::Uint16 serverID;
+            float vx,vy;
+            packet >> serverID >> vx >> vy;
+            if ( m_objects[serverID] != 0 ){
+                sf::Packet newPacket = m_objects[serverID]->setVelocity(vx,vy);
+                proxyTCPMessage( player, newPacket );
+            }
+            break;
+        }
+        case SHARED_FRICTION:{
+            sf::Uint16 serverID;
+            float friction;
+            packet >> serverID >> friction;
+            if ( m_objects[serverID] != 0 ){
+                sf::Packet newPacket = m_objects[serverID]->setFriction(friction);
+                proxyTCPMessage( player, newPacket );
+            }
+            break;
+        }
+        case SHARED_ROTATION:{
+            sf::Uint16 serverID;
+            float rotation;
+            packet >> serverID >> rotation;
+            if ( m_objects[serverID] != 0 ){
+                sf::Packet newPacket = m_objects[serverID]->setRotation(rotation);
+                proxyTCPMessage( player, newPacket );
+            }
+            break;
+        }
+        case SHARED_TEXTUREID:{
+            sf::Uint16 serverID;
+            sf::Uint16 textureID;
+            packet >> serverID >> textureID;
+            if ( m_objects[serverID] != 0 ){
+                sf::Packet newPacket = m_objects[serverID]->setTextureID(textureID);
+                proxyTCPMessage( player, newPacket );
+            }
+            break;
+        }
+        case SHARED_KILL:{
+            sf::Uint16 serverID;
+            packet >> serverID;
+            if ( m_objects[serverID] != 0 ){
+                sf::Packet newPacket = m_objects[serverID]->kill();
+                proxyTCPMessage( player, newPacket );
+
+                // Deallocate
+                delete m_objects[serverID];
+                m_objects[serverID] = 0;
+            }
+            break;
+        }
+
         case 502: // debug purpose
             registerServerEvent("vrp:bankrobbery",5010);
             break;
@@ -331,11 +443,32 @@ void PlayerList::proxyUDPMessage(unsigned int id, char* buffer, size_t size, boo
 
 }
 
+void PlayerList::proxyTCPMessage(unsigned int _id, sf::Packet packetToSend){
+    for ( std::vector<PlayerData*>::iterator it = playerData.begin(); it != playerData.end(); ++it ){
+        if ( (*it)->isOn ){
+            if ( (*it)->id == _id ) // skip the sender
+                continue;
+            (*it)->tcpSocket.send(packetToSend);
+        }
+    }
+}
+
+void PlayerList::proxyUDPMessage(unsigned int _id, sf::Packet packetToSend){
+    for ( std::vector<PlayerData*>::iterator it = playerData.begin(); it != playerData.end(); ++it ){
+        if ( (*it)->isOn ){
+            if ( (*it)->id == _id ) // skip the sender
+                continue;
+            sf::IpAddress address = (*it)->ipAddress;
+            udpSocket.send(packetToSend, address, 4474);
+        }
+    }
+}
+
+
 void PlayerList::broadcastTCPMessage(char* buffer, size_t size){
     for ( std::vector<PlayerData*>::iterator it = playerData.begin(); it != playerData.end(); ++it ){
         if ( (*it)->isOn ){
             (*it)->tcpSocket.send(buffer,size);
-            //std::cout << "BROADCASTED PACKET" << std::endl;
         }
     }
 }
@@ -355,7 +488,12 @@ void PlayerList::broadcastTCPMessage(sf::Packet packetToSend ){
 }
 
 void PlayerList::broadcastUDPMessage(sf::Packet packetToSend ){
-
+    for ( std::vector<PlayerData*>::iterator it = playerData.begin(); it != playerData.end(); ++it ){
+        if ( (*it)->isOn ){
+            sf::IpAddress address = (*it)->ipAddress;
+            udpSocket.send(packetToSend, address, 4474);
+        }
+    }
 }
 
 /*

@@ -11,6 +11,11 @@
 #include <map>
 #include <string>
 
+#include "Object.h"
+
+// Maximum number of server-side ( sync'd objects )
+#define MAX_SERVER_OBJECTS 1024
+
 class strless {
    public:
       bool operator() (const std::string & first, const std::string & second ) const  {
@@ -34,8 +39,12 @@ class PlayerList
         void broadcastTCPMessage( char * buffer, size_t size );
         void broadcastUDPMessage( char * buffer, size_t size );
 
+        void proxyTCPMessage( unsigned int id, sf::Packet packetToSend );
+        void proxyUDPMessage( unsigned int id, sf::Packet packetToSend );
         void broadcastTCPMessage( sf::Packet packetToSend );
         void broadcastUDPMessage( sf::Packet packetToSend );
+
+        sf::Uint16 registerObject( const Object & obj );
 
     protected:
 
@@ -48,6 +57,8 @@ class PlayerList
         PlayerData* createPlayerData();
         PlayerData* nextPlayerData;
         unsigned int playerCount;
+
+        Object * m_objects[MAX_SERVER_OBJECTS];
 
         PlayerData* getConnection( unsigned int playerID );
         void sendPeerData( PlayerData* connection );
