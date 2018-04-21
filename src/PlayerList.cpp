@@ -244,7 +244,7 @@ void PlayerList::receiveMessage(){
 
 }
 
-sf::Uint16 clientEvent = 50; // start allocation at 50
+sf::Uint16 clientEvent = 500; // start allocation at 50
 
 sf::Uint16 PlayerList::registerClientEvent(const char* eventName){
     std::map<std::string,sf::Uint16,strless>::const_iterator it = clientEvents.find(eventName);
@@ -501,6 +501,15 @@ void PlayerList::broadcastUDPMessage(sf::Packet packetToSend ){
         }
     }
 }
+
+void PlayerList::sendTCPMessageTo(sf::Packet packetToSend, int playerID){
+    getConnection(playerID)->tcpSocket.send(packetToSend);
+}
+
+void PlayerList::sendUDPMessageTo(sf::Packet packetToSend, int playerID){
+
+}
+
 
 /*
 void PlayerList::damageCrystal( unsigned int player ){

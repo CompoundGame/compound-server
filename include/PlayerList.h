@@ -43,6 +43,8 @@ class PlayerList
         void proxyUDPMessage( unsigned int id, sf::Packet packetToSend );
         void broadcastTCPMessage( sf::Packet packetToSend );
         void broadcastUDPMessage( sf::Packet packetToSend );
+        void sendTCPMessageTo( sf::Packet packetToSend, int playerID );
+        void sendUDPMessageTo( sf::Packet packetToSend, int playerID );
 
         sf::Uint16 registerObject( const Object & obj );
 

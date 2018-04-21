@@ -166,8 +166,72 @@ void LuaConsole::triggerServerEvent( sf::Uint16 eventCode, sf::Packet restOfPack
     }
 
     std::cout << "No such event with code " << eventCode << std::endl;
+}
 
+// TriggerClientEvent ( eventName, clientID, arg1, arg2 ... )
+int l_TriggerClientEvent(lua_State* L) {
 
+    char eventName[256];
+    strcpy(eventName,lua_tostring(L,1));
+
+    int args = lua_gettop(L);
+
+    std::string evName = eventName;
+
+    std::map<std::string,sf::Uint16>::iterator it;
+
+    sf::Uint16 eventCode = 0;
+
+    it = Server::playerList.clientEvents.find(evName);
+    if ( it != Server::playerList.clientEvents.end() )
+        eventCode = it->second;
+    else
+        return 0;
+
+    int receiverID = lua_tonumber(L,2);
+
+    if ( args == 2 ){
+        sf::Packet newPacket;
+        newPacket << eventCode;
+        if ( receiverID == -1 )
+            Server::playerList.broadcastTCPMessage(newPacket);
+        else
+            Server::playerList.sendTCPMessageTo(newPacket,receiverID);
+        return 0;
+    }else if ( args > 2 ){
+        sf::Packet newPacket;
+
+        float floatBuffer;
+        char stringBuffer[256];
+
+        newPacket << eventCode;
+        sf::Uint8 encoding = 0;
+        sf::Uint8 index = 1;
+        for ( int i = 3; i <= args; i++ ){
+            if ( !lua_isnumber(L,i) ){//0 for numbers, 1 for strings
+                encoding = encoding | index;
+            }
+            index = index << 1;
+        }
+
+        newPacket << encoding;
+        for ( int i = 3; i <= args; i++ ){
+            if ( lua_isnumber(L,i) ){
+                floatBuffer = lua_tonumber(L,i);
+                newPacket << floatBuffer;
+            }else{
+                strcpy(stringBuffer,lua_tostring(L,i));
+                newPacket << stringBuffer;
+            }
+        }
+
+        if ( receiverID == -1 )
+            Server::playerList.broadcastTCPMessage(newPacket);
+        else
+            Server::playerList.sendTCPMessageTo(newPacket,receiverID);
+    }
+
+    return 0;
 }
 
 void LuaConsole::init(){
@@ -199,6 +263,9 @@ void LuaConsole::init(){
 
         lua_pushcfunction(state, l_RegisterServerEvent);
         lua_setglobal(state, "RegisterServerEvent");
+
+        lua_pushcfunction(state, l_TriggerClientEvent);
+        lua_setglobal(state, "TriggerClientEvent");
 
 
     }
