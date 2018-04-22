@@ -173,6 +173,8 @@ void PlayerList::acceptNewConnection(){
             newConnection->ipAddress = newConnection->tcpSocket.getRemoteAddress();
             playerCount++;
 
+            LuaConsole::triggerPlayerConnected(newConnection->id);
+
             nextPlayerData = createPlayerData(); // relocate next connection etc etc
         }
         else if ( status != sf::Socket::Status::NotReady ){
@@ -202,6 +204,7 @@ void PlayerList::receiveMessage(){
                 std::cout << "Player Disconnected " << (*it)->id << std::endl;
                 (*it)->isOn = false;
                 takenIDS[(*it)->id] = false;
+                LuaConsole::triggerPlayerDropped((*it)->id);
                 playerCount--;
                 selector.remove( (*it)->tcpSocket );
 
@@ -305,6 +308,12 @@ void PlayerList::parseBuffer(unsigned int player){
         case S_REQUEST_SERVER_EVENTS: // Request Server Events
             PlayerList::sendServerEvents( player );
             std::cout << "Sent server events to player " << player << std::endl;
+
+            // Instruct the client to run clientside script(s)
+            packet.clear();
+            packet << C_RUN_CLIENT_SCRIPTS;
+            getConnection(player)->tcpSocket.send(packet);
+
             break;
         case S_REGISTER_CLIENT_EVENT:{ // Reguest Client Event Code
             sf::Uint16 clientEventCode;

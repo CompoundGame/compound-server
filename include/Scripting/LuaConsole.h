@@ -24,6 +24,8 @@ class LuaConsole
         //static void triggerKeyPressEvent( sf::Uint16 key );
 
         static void triggerServerEvent( sf::Uint16 eventCode, sf::Packet restOfPacket );
+        static void triggerPlayerConnected( int id );
+        static void triggerPlayerDropped( int id );
     protected:
 
     private:

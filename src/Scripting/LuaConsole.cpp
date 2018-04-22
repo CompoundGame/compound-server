@@ -234,6 +234,32 @@ int l_TriggerClientEvent(lua_State* L) {
     return 0;
 }
 
+void LuaConsole::triggerPlayerConnected( int id ){
+    lua_pushstring(LuaConsole::state, "onPlayerConnect");
+    lua_gettable(LuaConsole::state, LUA_REGISTRYINDEX);  /* retrieve value */
+
+    if ( lua_isnil(LuaConsole::state,-1) ) // if no function is registered for the event
+        return;
+
+    lua_pushnumber( LuaConsole::state, id );
+
+    //Now the function is on top of the stack
+    lua_call(LuaConsole::state,1,0); // call it - 1 arg, 0 ret
+}
+
+void LuaConsole::triggerPlayerDropped( int id ){
+    lua_pushstring(LuaConsole::state, "onPlayerDrop");
+    lua_gettable(LuaConsole::state, LUA_REGISTRYINDEX);  /* retrieve value */
+
+    if ( lua_isnil(LuaConsole::state,-1) ) // if no function is registered for the event
+        return;
+
+    lua_pushnumber( LuaConsole::state, id );
+
+    //Now the function is on top of the stack
+    lua_call(LuaConsole::state,1,0); // call it - 1 arg, 0 ret
+}
+
 void LuaConsole::init(){
     if ( state == NULL ){
         state = luaL_newstate();
