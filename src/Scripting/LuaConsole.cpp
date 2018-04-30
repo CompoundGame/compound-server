@@ -348,3 +348,8 @@ void LuaConsole::executeLine( const char * s ){
         }
     }
 }
+
+
+lua_State* LuaConsole::getState(){
+    return state;
+}

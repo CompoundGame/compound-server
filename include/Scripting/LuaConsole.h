@@ -26,6 +26,8 @@ class LuaConsole
         static void triggerServerEvent( sf::Uint16 eventCode, sf::Packet restOfPacket );
         static void triggerPlayerConnected( int id );
         static void triggerPlayerDropped( int id );
+
+        static lua_State * getState();
     protected:
 
     private:
