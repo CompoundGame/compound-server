@@ -50,6 +50,7 @@
 		<Unit filename="include/Object.h" />
 		<Unit filename="include/PlayerData.h" />
 		<Unit filename="include/PlayerList.h" />
+		<Unit filename="include/ResourceManager.h" />
 		<Unit filename="include/Scripting/LuaConsole.h" />
 		<Unit filename="include/Server.h" />
 		<Unit filename="include/SyncManager.h" />
@@ -192,6 +193,7 @@
 		<Unit filename="src/Object.cpp" />
 		<Unit filename="src/PlayerData.cpp" />
 		<Unit filename="src/PlayerList.cpp" />
+		<Unit filename="src/ResourceManager.cpp" />
 		<Unit filename="src/Scripting/LuaConsole.cpp" />
 		<Unit filename="src/Server.cpp" />
 		<Unit filename="src/SyncManager.cpp">

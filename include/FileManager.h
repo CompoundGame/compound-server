@@ -12,7 +12,8 @@
 class FileManager
 {
     public:
-        static void readFilesFromLuaState();
+        static void parseClientFiles();
+        static void parseServerFiles();
         static void loadFiles();
 
         //7df7147c7dd03126041c18e3b6431129

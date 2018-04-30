@@ -28,7 +28,7 @@ std::string FileManager::m_fileNames[MAX_FILES];
 char * FileManager::m_files[MAX_FILES];
 sf::Uint32 FileManager::m_fileSizes[MAX_FILES];
 
-void FileManager::readFilesFromLuaState(){
+void FileManager::parseClientFiles(){
     lua_State * L = LuaConsole::getState();
 
     lua_settop(L, 0);
@@ -56,6 +56,36 @@ void FileManager::readFilesFromLuaState(){
     }
     lua_settop(L,0);
 }
+
+void FileManager::parseServerFiles(){
+    lua_State * L = LuaConsole::getState();
+
+    lua_settop(L, 0);
+    lua_getglobal( L, "server_scripts" );
+
+    if ( lua_type(L,1) == LUA_TTABLE ){
+        std::cout << "[Lua] Reading serverside scripts names!" << std::endl;
+
+        int index = 1;
+        while( true ){
+            lua_pushnumber(L,index);
+            lua_gettable(L,1);
+            if ( lua_type(L,2) == LUA_TSTRING ){
+                std::cout << "[Lua] Loading server script (" << lua_tostring(L,2) << ")" << std::endl;
+                std::string script = "resources/crystal/";
+                script += lua_tostring(L,2);
+                LuaConsole::execute( script.c_str() );
+            }else
+                break;
+            lua_settop(L,1);
+            index++;
+        }
+    }else{
+        std::cout << "[Lua] No serverside scripts detected!" << std::endl;
+    }
+    lua_settop(L,0);
+}
+
 
 void FileManager::loadFile(sf::Uint32 id){
    FILE* f = fopen( m_fileNames[id].c_str(), "r" );

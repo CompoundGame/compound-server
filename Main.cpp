@@ -11,8 +11,9 @@ int main(){
 
     LuaConsole::init();
     LuaConsole::execute("resources/crystal/__resource.lua");
-    FileManager::readFilesFromLuaState();
+    FileManager::parseClientFiles();
     FileManager::loadFiles();
+    FileManager::parseServerFiles();
 
     while ( true ){
         //if ( SyncManager::selector.wait(sf::seconds(0.1f)) ){
