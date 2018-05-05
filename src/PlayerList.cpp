@@ -376,9 +376,10 @@ void PlayerList::parseBuffer(unsigned int player){
         }
         case SHARED_VELOCITY:{
             sf::Uint16 serverID;
-            float vx,vy;
-            packet >> serverID >> vx >> vy;
+            float vx,vy,x,y;
+            packet >> serverID >> vx >> vy >> x >> y;
             if ( m_objects[serverID] != 0 ){
+                m_objects[serverID]->setPosition(x,y);
                 sf::Packet newPacket = m_objects[serverID]->setVelocity(vx,vy);
                 proxyTCPMessage( player, newPacket );
             }

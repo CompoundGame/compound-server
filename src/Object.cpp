@@ -95,7 +95,7 @@ sf::Packet Object::setVelocity(const sf::Vector2f& velocity){
     vy = velocity.y;
 
     sf::Packet newPacket;
-    newPacket << SHARED_VELOCITY << serverID << vx << vy;
+    newPacket << SHARED_VELOCITY << serverID << vx << vy << x << y;
     return newPacket;
 }
 
@@ -105,7 +105,7 @@ sf::Packet Object::setVelocity(const float velx, const float vely){
     vy = vely;
 
     sf::Packet newPacket;
-    newPacket << SHARED_VELOCITY << serverID << vx << vy;
+    newPacket << SHARED_VELOCITY << serverID << vx << vy << x << y;
     return newPacket;
 }
 
